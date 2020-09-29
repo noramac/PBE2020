@@ -15,10 +15,10 @@ revision=`python -c "import RPi.GPIO as GPIO; print GPIO.RPI_REVISION"`
 if [ $revision = "1" ]
 then
 echo "I2C Pins detected as 0"
-cp installConfigs/i2c_lib_0.py ./i2c_lib.py
+cp i2c_lib_0.py ./i2c_lib.py
 else
 echo "I2C Pins detected as 1"
-cp installConfigs/i2c_lib_1.py ./i2c_lib.py
+cp i2c_lib_1.py ./i2c_lib.py
 fi
 echo "I2C Library setup for this revision of Raspberry Pi, if you change revision a modification will be required to i2c_lib.py"
 echo "Now overwriting modules & blacklist. This will enable i2c Pins"
