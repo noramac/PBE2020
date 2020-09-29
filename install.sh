@@ -22,12 +22,11 @@ cp i2c_lib_1.py ./i2c_lib.py
 fi
 echo "I2C Library setup for this revision of Raspberry Pi, if you change revision a modification will be required to i2c_lib.py"
 echo "Now overwriting modules & blacklist. This will enable i2c Pins"
-cp installConfigs/modules /etc/
-cp installConfigs/raspi-blacklist.conf /etc/modprobe.d/
+cp modules /etc/
+cp raspi-blacklist.conf /etc/modprobe.d/
 printf "dtparam=i2c_arm=1\n" >> /boot/config.txt
 
 
-echo "Should be now all finished. Please press any key to now reboot. After rebooting run"
-echo "'sudo python demo_lcd.py' from this directory"
+echo "Should be now all finished. Please press any key to now reboot. "
 read -n1 -s
 sudo reboot
