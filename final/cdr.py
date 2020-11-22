@@ -2,11 +2,15 @@ import gi
 import threading
 import urllib.request
 import lcddriver
+import json
 display = lcddriver.lcd() 
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
+from threading import Timer
+
+
 
 
 class Window(Gtk.Window):
@@ -91,6 +95,10 @@ class Window(Gtk.Window):
             self.thread_uid_in_use = True"""
             
     
+    #Generem la funció del timer.
+    def restart_timer(self):
+        global t
+        t = Timer(300,self.log_out)#5 minuts de timeout
 
 
 #Interfície de la pantalla de log in:
@@ -102,7 +110,7 @@ class Window(Gtk.Window):
         
         self.box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=10)  #Create box inside window
         self.box.set_homogeneous(False)
-        
+
         
         self.label = Gtk.Label(label="Please, login with your university card.")  #Create label
         self.label.set_name("label")
@@ -138,13 +146,15 @@ class Window(Gtk.Window):
         self.thread_login.daemon = True
         self.thread_login_in_use = False
         self.thread_login.start()
-
-        username = self.server_login(uid)
+        json_username = self.server_login(uid)
+        username = json.loads(json_username)["name"]
         if username == 'ERROR':
             self.error_uid()
         else:
             self.remove(self.pantalla1)
-            self.create_pantalla2(username)
+            self.create_pantalla2(username,uid)
+            self.restart_timer()
+            t.start()
             self.show_all()
 
     #Comunicació amb el servidor per fer login
@@ -152,7 +162,7 @@ class Window(Gtk.Window):
         self.thread_login_in_use = True
         link = 'http://192.168.1.205/pbe/login.php?uid=' + uid
         with urllib.request.urlopen(link) as f:
-            uname = f.read(100).decode('utf-8')
+            uname = f.read().decode('utf-8')
         self.thread_login_in_use = False
         return uname
 
@@ -176,7 +186,7 @@ class Window(Gtk.Window):
 #Interfície de la pantalla del course manager:
     
     #Es crea la pantalla amb el query     
-    def create_pantalla2(self,user):
+    def create_pantalla2(self,user,uid):
         self.pantalla2 = Gtk.Grid(column_homogeneous=True,column_spacing=10,row_spacing=250)              
         self.add(self.pantalla2)
 
@@ -187,12 +197,12 @@ class Window(Gtk.Window):
 
         logout = Gtk.Button(label="Logout")
         logout.set_hexpand(False)
-        logout.connect("clicked", self.log_out)
+        logout.connect("clicked", self.log_out_boton)
         self.pantalla2.attach(logout,5,0,1,1)
 
         entry = Gtk.Entry()
         entry.set_text("Insert query")
-        entry.connect("activate", self.get_table_for_query)
+        entry.connect("activate", self.get_table_from_query,uid)
         self.pantalla2.attach(entry,0,1,6,1)
 
         user_lcd = user[:20]
@@ -205,38 +215,57 @@ class Window(Gtk.Window):
 #Funcions associades a la pantalla del course manager:
         
     #Es passa el query al servidor i es mostren les dades
-    def get_table_for_query(self,entry):
+    def get_table_from_query(self,entry,uid):
+        t.cancel()
+        self.restart_timer()
+        t.start()
         query = entry.get_text()
-        self.thread_query = threading.Thread(target=self.server_send, args=(query,))  
+        neat_query = query.replace(' ','')
+        print(neat_query)
+        self.thread_query = threading.Thread(target=self.server_send, args=(neat_query,uid,))  
         self.thread_query.daemon = True
         self.thread_query_in_use = False
         self.thread_query.start()
-        timetable = self.server_send(query)
+        json_timetable = self.server_send(neat_query,uid)
+        print(json_timetable)
+        timetable = json.loads(json_timetable)
         self.mostra_taula(timetable)
 
+    #Mostra la taula a la pantalla
     def mostra_taula(self, taula):
         self.pantalla2.set_row_spacing(30)
         
-        
-
+    
     #Tanca sessió i torna a la pantalla de login
-    def log_out(self, logout):
+    def log_out(self):
+        t.cancel()#es posa 2 vegades perque amb 1 falla de vegades
         self.remove(self.pantalla2)
         self.create_pantalla1()
         self.show_all()
+        t.cancel()
+    
+    #Tanca la sessió desde el botó
+    def log_out_boton(self, logout):
+        self.log_out()
 
+    
     #Comunicació amb el servidor per rebre dades
-    def server_send(self, query):
+    def server_send(self, query, uid):
+        if '?' not in query:
+            link = 'http://192.168.1.205/pbe/index.php?' + query + '?uid='+uid
+        else:
+            link = 'http://192.168.1.205/pbe/index.php?' + query + '&uid='+uid
         self.thread_query_in_use = True
-        link = 'http://192.168.1.205/pbe/index.php' + query
         with urllib.request.urlopen(link) as f:
-            table = f.read(100).decode('utf-8')
+            json_table = f.read().decode('utf-8')    
         self.thread_server_in_use = False
-        return table
-        
+        return json_table
+
+    
 
 
 if __name__ == "__main__":
   win = Window()
   win.show_all()
   Gtk.main()
+            
