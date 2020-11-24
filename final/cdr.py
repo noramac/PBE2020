@@ -3,12 +3,16 @@ import threading
 import urllib.request
 import lcddriver
 import json
+import time
 display = lcddriver.lcd() 
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
 from threading import Timer
+from adri import Rfid
+from pirc522 import RFID
+import RPi.GPIO as GPIO
 
 
 
@@ -21,16 +25,15 @@ class Window(Gtk.Window):
         self.set_border_width(10)
 
         self.create_pantalla1()
+        
 
-        #Thread per el lector de targetes
-        self.thread_uid = threading.Thread(target=self.uid)  
-        self.thread_uid.daemon = True
-        self.thread_uid_in_use = True
-        self.thread_uid.start()
 
+        
         
 
         
+
+        '''
         #define blue style
         self.blue = b""" 
                     box {
@@ -81,8 +84,12 @@ class Window(Gtk.Window):
         self.context = Gtk.StyleContext()
         self.screen = Gdk.Screen.get_default()
         self.context.add_provider_for_screen(self.screen, self.css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-
-        
+'''
+        '''#Thread per el lector de targetes
+        self.thread_uid = threading.Thread(target=self.log_in)  
+        self.thread_uid.daemon = True
+        self.thread_uid_in_use = True
+        self.thread_uid.start()'''
 
         
     """def on_button_clicked(self, widget):  #function when "clear" button is clicked
@@ -93,7 +100,9 @@ class Window(Gtk.Window):
             self.thread_uid = threading.Thread(target=self.uid)
             self.thread_uid.start()
             self.thread_uid_in_use = True"""
-            
+    
+        
+    rf = RFID()
     
     #Generem la funció del timer.
     def restart_timer(self):
@@ -102,6 +111,7 @@ class Window(Gtk.Window):
 
 
 #Interfície de la pantalla de log in:
+        
     
     #Es crea la pantalla de login
     def create_pantalla1(self):
@@ -117,30 +127,44 @@ class Window(Gtk.Window):
         self.box.pack_start(self.label, True, True, 0)
         self.box.set_vexpand(False)
 
-        login = Gtk.Button.new_with_label("Boton login (inutil)")
-        login.connect("clicked", self.log_in)
+        
+        #login = Gtk.Button.new_with_label("Boton login (inutil)")
+        #login.connect("clicked", self.log_in)
         
         #Adding box to window
         self.pantalla1.attach(self.box,0,1,1,1)
-        self.pantalla1.attach(login,0,0,1,1)
+        #self.pantalla1.attach(login,0,0,1,1)
         
+
         display.lcd_clear()
         display.lcd_display_string('Please, login with', 2)
         display.lcd_display_string('your university card', 3)
+
+        self.pantalla1.show_all()
+        print('Pantalla')
+        self.log_in()
+        threading.Thread(target=self.log_in, daemon=True)
         
+        
+    
 
 #Funcions associades a la pantalla de log in:
 
+    def read_uid(self):
+        print("flag2")
+        uid = Rfid.read_uid(self.rf)
+        print("flag3")
+        return uid
+        
+
     #Funcio login
-    #Si reconeix el uid passa a la pantalla 2 si no dona error
-    def uid(self):
-        self.rfid = Rfidpuzzle1()  #object from the class of puzzle1
-        self.thread_uid_in_use = False
-        return self.rfid.read_uid()
-    
-    def log_in(self, login):
-        #uid = self.uid()
-        uid = '890C769C'
+    #Si reconeix el uid passa a la pantalla 2 si no dona error   
+    def log_in(self):
+        print("flag1")
+        threading.Thread(target=self.read_uid, daemon=True)
+        uid = self.read_uid()
+        print(uid)
+        #uid = '890C769C'
         #Thread per la comunicació amb el servidor
         self.thread_login = threading.Thread(target=self.server_login, args=(uid,))  
         self.thread_login.daemon = True
@@ -150,9 +174,13 @@ class Window(Gtk.Window):
         username = json.loads(json_username)["name"]
         if username == 'ERROR':
             self.error_uid()
+            self.remove(self.pantalla1)
+            self.create_pantalla1()
         else:
+            
             self.remove(self.pantalla1)
             self.create_pantalla2(username,uid)
+            print("flag4")
             self.restart_timer()
             t.start()
             self.show_all()
@@ -160,7 +188,7 @@ class Window(Gtk.Window):
     #Comunicació amb el servidor per fer login
     def server_login(self, uid):
         self.thread_login_in_use = True
-        link = 'http://192.168.1.205/pbe/login.php?uid=' + uid
+        link = 'http://192.168.1.206/pbe/login.php?uid=' + uid
         with urllib.request.urlopen(link) as f:
             uname = f.read().decode('utf-8')
         self.thread_login_in_use = False
@@ -168,6 +196,7 @@ class Window(Gtk.Window):
 
     #Missatge d'error quan no es reconeix el uid
     def error_uid(self):   #misstge d'error
+        print('Error uid')
         dialog = Gtk.MessageDialog(
             name = "error",
             transient_for=self,
@@ -221,7 +250,6 @@ class Window(Gtk.Window):
         t.start()
         query = entry.get_text()
         neat_query = query.replace(' ','')
-        print(neat_query)
         self.thread_query = threading.Thread(target=self.server_send, args=(neat_query,uid,))  
         self.thread_query.daemon = True
         self.thread_query_in_use = False
@@ -252,9 +280,9 @@ class Window(Gtk.Window):
     #Comunicació amb el servidor per rebre dades
     def server_send(self, query, uid):
         if '?' not in query:
-            link = 'http://192.168.1.205/pbe/index.php?' + query + '?uid='+uid
+            link = 'http://192.168.1.206/pbe/index.php?' + query + '?uid='+uid
         else:
-            link = 'http://192.168.1.205/pbe/index.php?' + query + '&uid='+uid
+            link = 'http://192.168.1.206/pbe/index.php?' + query + '&uid='+uid
         self.thread_query_in_use = True
         with urllib.request.urlopen(link) as f:
             json_table = f.read().decode('utf-8')    
