@@ -3,18 +3,15 @@ import threading
 import urllib.request
 import lcddriver
 import json
-import time
 display = lcddriver.lcd() 
 
 gi.require_version("Gtk", "3.0")
 from gi.repository import Gtk
 from gi.repository import Gdk
 from threading import Timer
-from adri import Rfid
-from pirc522 import RFID
-import RPi.GPIO as GPIO
+#from Rfid_puzzle1 import Rfidpuzzle1    #funciones para leer nfc
 
-
+ip = '192.168.1.206'       #ip del servidor
 
 
 class Window(Gtk.Window):
@@ -25,15 +22,14 @@ class Window(Gtk.Window):
         self.set_border_width(10)
 
         self.create_pantalla1()
-        
 
+        #Thread per el lector de targetes
+        self.thread_uid = threading.Thread(target=self.uid)  
+        self.thread_uid.daemon = True
+        self.thread_uid_in_use = True
+        self.thread_uid.start()
 
         
-        
-
-        
-
-        '''
         #define blue style
         self.blue = b""" 
                     box {
@@ -54,8 +50,6 @@ class Window(Gtk.Window):
                       padding: 50px;
                       margin: 20px;
                     }
-
-
                 """
         
         #define red style    
@@ -84,12 +78,8 @@ class Window(Gtk.Window):
         self.context = Gtk.StyleContext()
         self.screen = Gdk.Screen.get_default()
         self.context.add_provider_for_screen(self.screen, self.css_provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
-'''
-        '''#Thread per el lector de targetes
-        self.thread_uid = threading.Thread(target=self.log_in)  
-        self.thread_uid.daemon = True
-        self.thread_uid_in_use = True
-        self.thread_uid.start()'''
+
+        
 
         
     """def on_button_clicked(self, widget):  #function when "clear" button is clicked
@@ -100,9 +90,7 @@ class Window(Gtk.Window):
             self.thread_uid = threading.Thread(target=self.uid)
             self.thread_uid.start()
             self.thread_uid_in_use = True"""
-    
-        
-    rf = RFID()
+            
     
     #Generem la funció del timer.
     def restart_timer(self):
@@ -111,7 +99,6 @@ class Window(Gtk.Window):
 
 
 #Interfície de la pantalla de log in:
-        
     
     #Es crea la pantalla de login
     def create_pantalla1(self):
@@ -127,46 +114,32 @@ class Window(Gtk.Window):
         self.box.pack_start(self.label, True, True, 0)
         self.box.set_vexpand(False)
 
-        
-        #login = Gtk.Button.new_with_label("Boton login (inutil)")
-        #login.connect("clicked", self.log_in)
+        login = Gtk.Button.new_with_label("Boton login (inutil)")
+        login.connect("clicked", self.log_in)
         
         #Adding box to window
         self.pantalla1.attach(self.box,0,1,1,1)
-        #self.pantalla1.attach(login,0,0,1,1)
+        self.pantalla1.attach(login,0,0,1,1)
         
-
         display.lcd_clear()
         display.lcd_display_string('Please, login with', 2)
         display.lcd_display_string('your university card', 3)
-
-        self.pantalla1.show_all()
-        print('Pantalla')
-        self.log_in()
-        threading.Thread(target=self.log_in, daemon=True)
         
-        
-    
 
 #Funcions associades a la pantalla de log in:
 
-    def read_uid(self):
-        print("flag2")
-        uid = Rfid.read_uid(self.rf)
-        print("flag3")
-        return uid
-        
-
     #Funcio login
-    #Si reconeix el uid passa a la pantalla 2 si no dona error   
-    def log_in(self):
-        print("flag1")
-        threading.Thread(target=self.read_uid, daemon=True)
-        uid = self.read_uid()
-        print(uid)
-        #uid = '890C769C'
+    #Si reconeix el uid passa a la pantalla 2 si no dona error
+    def uid(self):
+        self.rfid = Rfidpuzzle1()  #object from the class of puzzle1
+        self.thread_uid_in_use = False
+        return self.rfid.read_uid()
+    
+    def log_in(self, login):
+        #uid = self.uid()
+        uid = '890C769C'
         #Thread per la comunicació amb el servidor
-        self.thread_login = threading.Thread(target=self.server_login, args=(uid,))  
+        self.thread_login = threading.Thread(target=self.server_login, args=(uid,))
         self.thread_login.daemon = True
         self.thread_login_in_use = False
         self.thread_login.start()
@@ -174,13 +147,9 @@ class Window(Gtk.Window):
         username = json.loads(json_username)["name"]
         if username == 'ERROR':
             self.error_uid()
-            self.remove(self.pantalla1)
-            self.create_pantalla1()
         else:
-            
             self.remove(self.pantalla1)
             self.create_pantalla2(username,uid)
-            print("flag4")
             self.restart_timer()
             t.start()
             self.show_all()
@@ -188,7 +157,7 @@ class Window(Gtk.Window):
     #Comunicació amb el servidor per fer login
     def server_login(self, uid):
         self.thread_login_in_use = True
-        link = 'http://192.168.1.206/pbe/login.php?uid=' + uid
+        link = 'http://' + ip + '/pbe/login.php?uid=' + uid
         with urllib.request.urlopen(link) as f:
             uname = f.read().decode('utf-8')
         self.thread_login_in_use = False
@@ -196,7 +165,6 @@ class Window(Gtk.Window):
 
     #Missatge d'error quan no es reconeix el uid
     def error_uid(self):   #misstge d'error
-        print('Error uid')
         dialog = Gtk.MessageDialog(
             name = "error",
             transient_for=self,
@@ -230,7 +198,7 @@ class Window(Gtk.Window):
         self.pantalla2.attach(logout,5,0,1,1)
 
         entry = Gtk.Entry()
-        entry.set_text("Insert query")
+        entry.set_placeholder_text("Insert query")
         entry.connect("activate", self.get_table_from_query,uid)
         self.pantalla2.attach(entry,0,1,6,1)
 
@@ -250,12 +218,13 @@ class Window(Gtk.Window):
         t.start()
         query = entry.get_text()
         neat_query = query.replace(' ','')
+        print(neat_query)
         self.thread_query = threading.Thread(target=self.server_send, args=(neat_query,uid,))  
         self.thread_query.daemon = True
         self.thread_query_in_use = False
         self.thread_query.start()
         json_timetable = self.server_send(neat_query,uid)
-        print(json_timetable)
+        #print(json_timetable)
         timetable = json.loads(json_timetable)
         self.mostra_taula(timetable)
 
@@ -263,6 +232,55 @@ class Window(Gtk.Window):
     def mostra_taula(self, taula):
         self.pantalla2.set_row_spacing(30)
         
+        query = list(taula.keys())[1]
+    
+        if query == 'timetables':            #caso para 4 columnas
+            self.table = Gtk.ListStore(str, str, str, str)       #creamos un modelo de TreeView a partir de una liststore de 4 columnas de strings
+            
+            columnas = list(taula[query][0].keys())       #hacemos una lista de los titulos/cabeceras de cada columna
+            
+            for row in taula[query]:
+                self.table.append([row[columnas[0]],row[columnas[1]],row[columnas[2]],row[columnas[3]]])      #añadimos la información de cada fila
+            
+            self.treeview = Gtk.TreeView.new_with_model(self.table)       #creamos un TreeView a partir del modelo
+                        
+            for i, column_title in enumerate([columnas[0],columnas[1],columnas[2],columnas[3]]):    #loop para poner titulo y configurar el diseño de cada una de las columnas
+                renderer = Gtk.CellRendererText()       #creamos un renderer
+                renderer.set_fixed_size(220,40)       #definimos medidas de las celdas
+                renderer.set_property("xalign",0.5)     #centramos los titulos
+                column = Gtk.TreeViewColumn(column_title,renderer,text=i)      #creamos un TreeViewColumn con las características anteriores que se añadirá al TreeView
+                column.set_alignment(0.5)        #centramos los contenidos de las celdas
+                self.treeview.append_column(column)       #añadimos el TreeViewColumn al TreeView
+                 
+            self.scrollable_treelist = Gtk.ScrolledWindow()          #hacemos que la ventana sea scrolled en cas que la tabla sea muy grande
+            self.scrollable_treelist.set_vexpand(True)            #expandimos la tabla en la ventana
+            self.pantalla2.attach(self.scrollable_treelist,0,3,6,6)       #añadimos la tabla en el grid
+            self.scrollable_treelist.add(self.treeview)
+            win.show_all()
+            
+        elif query == 'tasks' or query == 'marks':        #caso para 3 columnas
+            self.table = Gtk.ListStore(str, str, str)       #creamos un modelo de TreeView a partir de una liststore de 3 columnas de strings
+            
+            columnas = list(taula[query][0].keys())      #hacemos una lista de los titulos/cabeceras de cada columna
+            
+            for row in taula[query]:         
+                self.table.append([row[columnas[0]],row[columnas[1]],row[columnas[2]]])     #añadimos la información de cada fila
+            
+            self.treeview = Gtk.TreeView.new_with_model(self.table)            #creamos un TreeView a partir del modelo
+            
+            for i, column_title in enumerate([columnas[0],columnas[1],columnas[2]]):     #loop para poner titulo y configurar el diseño de cada una de las columnas
+                renderer = Gtk.CellRendererText()         #creamos un renderer
+                renderer.set_fixed_size(310,40)             #definimos medidas de las celdas
+                renderer.set_property("xalign",0.5)       #centramos los titulos
+                column = Gtk.TreeViewColumn(column_title,renderer,text=i)         #creamos un TreeViewColumn con las características anteriores que se añadirá al TreeView
+                column.set_alignment(0.5)           #centramos los contenidos de las celdas
+                self.treeview.append_column(column)         #añadimos el TreeViewColumn al TreeView
+                 
+            self.scrollable_treelist = Gtk.ScrolledWindow()      #hacemos que la ventana sea scrolled en cas que la tabla sea muy grande
+            self.scrollable_treelist.set_vexpand(True)           #expandimos la tabla en la ventana
+            self.pantalla2.attach(self.scrollable_treelist,0,3,6,6)       #añadimos la tabla en el grid
+            self.scrollable_treelist.add(self.treeview)
+            win.show_all()
     
     #Tanca sessió i torna a la pantalla de login
     def log_out(self):
@@ -280,9 +298,10 @@ class Window(Gtk.Window):
     #Comunicació amb el servidor per rebre dades
     def server_send(self, query, uid):
         if '?' not in query:
-            link = 'http://192.168.1.206/pbe/index.php?' + query + '?uid='+uid
+            link = 'http://'+ip+'/pbe/index.php?' + query + '?uid='+uid
+            print(link)
         else:
-            link = 'http://192.168.1.206/pbe/index.php?' + query + '&uid='+uid
+            link = 'http://'+ip+'/pbe/index.php?' + query + '&uid='+uid
         self.thread_query_in_use = True
         with urllib.request.urlopen(link) as f:
             json_table = f.read().decode('utf-8')    
@@ -296,4 +315,5 @@ if __name__ == "__main__":
   win = Window()
   win.show_all()
   Gtk.main()
+s
             
