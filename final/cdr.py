@@ -228,59 +228,7 @@ class Window(Gtk.Window):
         timetable = json.loads(json_timetable)
         self.mostra_taula(timetable)
 
-    #Mostra la taula a la pantalla
-    def mostra_taula(self, taula):
-        self.pantalla2.set_row_spacing(30)
-        
-        query = list(taula.keys())[1]
     
-        if query == 'timetables':            #caso para 4 columnas
-            self.table = Gtk.ListStore(str, str, str, str)       #creamos un modelo de TreeView a partir de una liststore de 4 columnas de strings
-            
-            columnas = list(taula[query][0].keys())       #hacemos una lista de los titulos/cabeceras de cada columna
-            
-            for row in taula[query]:
-                self.table.append([row[columnas[0]],row[columnas[1]],row[columnas[2]],row[columnas[3]]])      #añadimos la información de cada fila
-            
-            self.treeview = Gtk.TreeView.new_with_model(self.table)       #creamos un TreeView a partir del modelo
-                        
-            for i, column_title in enumerate([columnas[0],columnas[1],columnas[2],columnas[3]]):    #loop para poner titulo y configurar el diseño de cada una de las columnas
-                renderer = Gtk.CellRendererText()       #creamos un renderer
-                renderer.set_fixed_size(220,40)       #definimos medidas de las celdas
-                renderer.set_property("xalign",0.5)     #centramos los titulos
-                column = Gtk.TreeViewColumn(column_title,renderer,text=i)      #creamos un TreeViewColumn con las características anteriores que se añadirá al TreeView
-                column.set_alignment(0.5)        #centramos los contenidos de las celdas
-                self.treeview.append_column(column)       #añadimos el TreeViewColumn al TreeView
-                 
-            self.scrollable_treelist = Gtk.ScrolledWindow()          #hacemos que la ventana sea scrolled en cas que la tabla sea muy grande
-            self.scrollable_treelist.set_vexpand(True)            #expandimos la tabla en la ventana
-            self.pantalla2.attach(self.scrollable_treelist,0,3,6,6)       #añadimos la tabla en el grid
-            self.scrollable_treelist.add(self.treeview)
-            win.show_all()
-            
-        elif query == 'tasks' or query == 'marks':        #caso para 3 columnas
-            self.table = Gtk.ListStore(str, str, str)       #creamos un modelo de TreeView a partir de una liststore de 3 columnas de strings
-            
-            columnas = list(taula[query][0].keys())      #hacemos una lista de los titulos/cabeceras de cada columna
-            
-            for row in taula[query]:         
-                self.table.append([row[columnas[0]],row[columnas[1]],row[columnas[2]]])     #añadimos la información de cada fila
-            
-            self.treeview = Gtk.TreeView.new_with_model(self.table)            #creamos un TreeView a partir del modelo
-            
-            for i, column_title in enumerate([columnas[0],columnas[1],columnas[2]]):     #loop para poner titulo y configurar el diseño de cada una de las columnas
-                renderer = Gtk.CellRendererText()         #creamos un renderer
-                renderer.set_fixed_size(310,40)             #definimos medidas de las celdas
-                renderer.set_property("xalign",0.5)       #centramos los titulos
-                column = Gtk.TreeViewColumn(column_title,renderer,text=i)         #creamos un TreeViewColumn con las características anteriores que se añadirá al TreeView
-                column.set_alignment(0.5)           #centramos los contenidos de las celdas
-                self.treeview.append_column(column)         #añadimos el TreeViewColumn al TreeView
-                 
-            self.scrollable_treelist = Gtk.ScrolledWindow()      #hacemos que la ventana sea scrolled en cas que la tabla sea muy grande
-            self.scrollable_treelist.set_vexpand(True)           #expandimos la tabla en la ventana
-            self.pantalla2.attach(self.scrollable_treelist,0,3,6,6)       #añadimos la tabla en el grid
-            self.scrollable_treelist.add(self.treeview)
-            win.show_all()
     
     #Tanca sessió i torna a la pantalla de login
     def log_out(self):
