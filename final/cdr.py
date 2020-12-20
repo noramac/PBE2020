@@ -11,7 +11,7 @@ from gi.repository import Gdk
 from threading import Timer
 #from Rfid_puzzle1 import Rfidpuzzle1    #funciones para leer nfc
 
-ip = '192.168.1.206'       #ip del servidor
+
 
 
 class Window(Gtk.Window):
